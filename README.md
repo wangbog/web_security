@@ -1,3 +1,5 @@
+# 安全问题：php代码sql注入问题浅析及解决
+
 PHP作为弱类型语言，在早期Web程序由于编写不规范，较容易出现SQL注入问题。本文提供几个示例程序简单介绍SQL注入是如何产生的，以及常见的修复方法。本文用到的代码，可参考：[sqltest.php](https://github.com/wangbog/php_sql_injection/blob/master/sqltest.php)
 
 ### 测试1：理想中的正常情况，即预期根据用户输入查询数据库表，假定无SQL注入的情况
