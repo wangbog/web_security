@@ -6,6 +6,7 @@
 
 ```
 yum install mod_security -y
+
 service httpd restart
 ```
 
