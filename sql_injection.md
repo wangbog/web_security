@@ -159,7 +159,80 @@ Array
 )
 ```
 
+### 测试6：不完善的改法
+
+网上经常有介绍一种防SQL注入的做法，即输入参数过滤掉诸如SELECT、UNION等关键字。注：为了演示方便，此测试有一个小前提，即后端代码允许一次执行多条SQL语句，即执行的查询语句为$conn->multi_query($sql)。如：
+
+```
+$id = $_GET["id6"];
+$conn = new mysqli($servername, $username, $password, $dbname);
+$conn->set_charset("utf8");
+$sql = "SELECT * FROM person WHERE id = $id";
+echo "\n测试6结果：\n";
+echo $sql . "\n";
+$result = $conn->multi_query($sql);
+if ($result) {
+    do {
+        if ($mysqli_result = $conn->use_result()) {
+            print_r($mysqli_result->fetch_all(MYSQLI_ASSOC));
+        }
+    } while ($conn->more_results() && $conn->next_result());
+} else {
+    echo "error " . $conn->errno . " : " . $conn->error;
+}
+$conn->close();
+```
+
+还是以上面的数字类型id的SQL查询语句为例，假如黑客构造的输入参数为：
+
+```
+1 union select * from person
+```
+
+这样是可以通过联合查询查出全部数据的，最终的SQL语句为：
+
+```
+SELECT * FROM person WHERE id = 1 union select * from person
+```
+
+过滤关键字的防范手段，可以类似这样（为了展示只过滤了select和union，并且只过滤了小写字母。真实情况中应过滤所有可能的关键词，并考虑大小写情况）：
+
+```
+$id = $_GET["id6"];
+$id = filterSQL($id);
+……
+function filterSQL($param)
+{
+    if (empty($param)) return false;
+    $param = str_replace('select', "hacker", $param);
+    $param = str_replace('union', "hacker", $param);
+    return $param;
+}
+```
+
+这样看上去可以解决该问题，返回结果报错：
+
+```
+SELECT * FROM person WHERE id = 1 hacker hacker * from person
+error 1064 : You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near 'hacker hacker * from person' at line 1
+```
+
+但是，黑客其实可以利用SQL自身的PREPARE机制和SQL自带的CONCAT函数，将select等关键字拆分（命中不了上述filterSQL函数的过滤规则了），然后执行这个prepare statement！比如这样构造输入参数：
+
+```
+1;set @sqlcmd = CONCAT('sele', 'ct * from person'); prepare stmt_hack from @sqlcmd;execute stmt_hack;
+```
+
+则最终的SQL语句如下，是可以查询出所有数据的！
+
+```
+SELECT * FROM person WHERE id = 1;set @sqlcmd = CONCAT('sele', 'ct * from person'); prepare stmt_hack from @sqlcmd;execute stmt_hack;
+```
+
+所以，这种过滤SQL关键词的方法，不能很好地防范所有SQL注入问题。
+
 ### 补充教程：使用SQLMAP自动发现注入漏洞！！
+
 上面讲的是手工发现SQL注入点，结合代码进行修复的过程。如果您想知道如何自动检测自己的网站是否可能有SQL注入漏洞，这里介绍一下SQLMAP。SQLMAP是著名的SQL注入自动探测工具，其实质是把我们上面讲的规则做了自动化，当然不只是我们讲的这些，它包含了大量的SQL注入数据库，功能非常强大。
 
 **注意：请不要随意使用SQLMAP，在未通知目标网站管理员的情况下使用SQLMAP是违法行为！！！**

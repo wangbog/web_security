@@ -33,6 +33,15 @@
                 <td><input type="submit" name="test5" value="查询"><td>
                 <td>推荐解决方案：使用PDO prepared statement<td>
             <tr>
+            <tr>
+                <td>测试6<td>
+                <td>查询id(数字类型):
+                    <input type="text" name="id6" size="100" value="1 union select * from person"><br>
+                    <input type="text" name="id6a" size="100"
+                           value="1;set @sqlcmd = CONCAT('sele', 'ct * from person'); prepare stmt_hack from @sqlcmd;execute stmt_hack;"><td>
+                <td><input type="submit" name="test6" value="查询"><td>
+                <td>注入：企图过滤SQL关键字（过滤掉了）<td>
+            <tr>
         </table>
 
 	</form>
@@ -126,13 +135,70 @@
         $conn = new PDO("mysql:host=$servername;dbname=$dbname;charset=utf8", $username, $password);
         $sql = "SELECT * FROM person WHERE id = :id";
         $stmt = $conn->prepare($sql);
-        $stmt->bindParam ( ':id' ,  $id );
+        $stmt->bindParam(':id', $id);
         echo "\n测试5结果：\n";
         echo $sql . "\n";
         $stmt->execute();
         $result = $stmt->fetchAll();
         print_r($result);
         $conn = null;
+    }
+    if (isset($_GET['test6'])) {
+        $id = $_GET["id6"];
+        $conn = new mysqli($servername, $username, $password, $dbname);
+        $conn->set_charset("utf8");
+        $sql = "SELECT * FROM person WHERE id = $id";
+        echo "\n测试6结果：\n";
+        echo $sql . "\n";
+        $result = $conn->multi_query($sql);
+        if ($result) {
+            do {
+                if ($mysqli_result = $conn->use_result()) {
+                    print_r($mysqli_result->fetch_all(MYSQLI_ASSOC));
+                }
+            } while ($conn->more_results() && $conn->next_result());
+        } else {
+            echo "error " . $conn->errno . " : " . $conn->error;
+        }
+        $conn->close();
+
+        $id = $_GET["id6"];
+        $id = filterSQL($id);
+        $conn = new mysqli($servername, $username, $password, $dbname);
+        $conn->set_charset("utf8");
+        $sql = "SELECT * FROM person WHERE id = $id";
+        echo "\n测试6解决（常规方法）：\n";
+        echo $sql . "\n";
+        $result = $conn->multi_query($sql);
+        if ($result) {
+            do {
+                if ($mysqli_result = $conn->use_result()) {
+                    print_r($mysqli_result->fetch_all(MYSQLI_ASSOC));
+                }
+            } while ($conn->more_results() && $conn->next_result());
+        } else {
+            echo "error " . $conn->errno . " : " . $conn->error;
+        }
+        $conn->close();
+
+        $id = $_GET["id6a"];
+        $id = filterSQL($id);
+        $conn = new mysqli($servername, $username, $password, $dbname);
+        $conn->set_charset("utf8");
+        $sql = "SELECT * FROM person WHERE id = $id";
+        echo "\n\n测试6结果(通过构造prepare语句)：\n";
+        echo $sql . "\n";
+        $result = $conn->multi_query($sql);
+        if ($result) {
+            do {
+                if ($mysqli_result = $conn->use_result()) {
+                    print_r($mysqli_result->fetch_all(MYSQLI_ASSOC));
+                }
+            } while ($conn->more_results() && $conn->next_result());
+        } else {
+            echo "error " . $conn->errno . " : " . $conn->error;
+        }
+        $conn->close();
     }
 
 
@@ -146,6 +212,15 @@
         } else {
             echo "0 results";
         }
+    }
+
+
+    function filterSQL($param)
+    {
+        if (empty($param)) return false;
+        $param = str_replace('select', "hacker", $param);
+        $param = str_replace('union', "hacker", $param);
+        return $param;
     }
 
     ?>
